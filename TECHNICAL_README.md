@@ -301,3 +301,6 @@ jstat -gc <pid>
 ---
 
 **Not**: Bu dokümantasyon, projenin teknik detaylarını ve performans optimizasyonlarını açıklamaktadır. Production deployment öncesi güvenlik ve monitoring konfigürasyonları eklenmelidir.
+
+---
+Sunum icin : https://docs.google.com/presentation/d/1NRF51POrabmn1fasY3babKVDkKWLpZv-XDoAg3NdiVM/edit?usp=sharing
