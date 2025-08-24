@@ -1,0 +1,130 @@
+spring:
+  application:
+    name: fleet-temperature-dashboard
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: fleet-temperature-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: "*"
+        spring.json.trust.all: true
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.fleet.temperature.dto.VHFMessageDto
+        # Enhanced error handling
+        spring.json.fail.on.unknown.properties: false
+        spring.json.fail.on.unknown.type: false
+        spring.json.fail.on.missing.type: false
+        spring.json.ignore.type.headers: true
+        spring.json.ignore.unknown.properties: true
+        spring.json.ignore.missing.type: true
+        # Force type mapping
+        spring.json.type.mapping: "vhf-message:com.fleet.temperature.dto.VHFMessageDto,fleet-cabin-temperature-raw:com.fleet.temperature.dto.VHFMessageDto,default:com.fleet.temperature.dto.VHFMessageDto"
+        # Partition key ordering optimizations
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.RoundRobinAssignor
+        enable.auto.commit: false
+        # High throughput optimizations
+        fetch.min.bytes: 1024
+        fetch.max.wait.ms: 500
+        max.partition.fetch.bytes: 1048576
+        max.poll.records: 100
+        max.poll.interval.ms: 600000
+        session.timeout.ms: 60000
+        heartbeat.interval.ms: 20000
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fleet_temperature
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      validation-timeout: 5000
+      connection-test-query: SELECT 1
+      auto-commit: false
+      # Connection pool optimizations for batch processing
+      connection-init-sql: SET SESSION synchronous_commit = off
+      pool-name: FleetTemperatureHikariCP
+      register-mbeans: true
+      # Transaction isolation
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        jdbc.batch_size: 100
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+        connection.provider_disables_autocommit: true
+
+        jdbc:
+          time_zone: UTC
+        # Disable autoCommit for proper transaction management
+        connection.auto_commit: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+server:
+  port: 8082
+
+logging:
+  level:
+    com.fleet.temperature: DEBUG
+    org.springframework.kafka: DEBUG
+    org.apache.kafka: DEBUG
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+
+
+# Temperature Thresholds
+temperature:
+  warning-threshold: 25.0
+  critical-threshold: 28.0
+
+# Task Configuration for Async Processing
+task:
+  executor:
+    core-pool-size: 10
+    max-pool-size: 50
+    queue-capacity: 1000
+    keep-alive-seconds: 60
+    thread-name-prefix: "fleet-temp-"
+
+# Swagger/OpenAPI Configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    doc-expansion: none
+    disable-swagger-default-url: true
+  packages-to-scan: com.fleet.temperature.controller
+  paths-to-match: /api/**
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
