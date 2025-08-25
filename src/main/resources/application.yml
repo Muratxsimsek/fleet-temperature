@@ -2,7 +2,7 @@ spring:
   application:
     name: fleet-temperature-dashboard
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: fleet-temperature-group
       auto-offset-reset: earliest
@@ -36,9 +36,9 @@ spring:
         heartbeat.interval.ms: 20000
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/fleet_temperature
-    username: postgres
-    password: postgres
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/fleet_temperature}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 50

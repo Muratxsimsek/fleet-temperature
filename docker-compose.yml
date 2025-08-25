@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # Infrastructure Services
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     container_name: fleet-temperature-zookeeper
@@ -10,7 +11,7 @@ services:
     ports:
       - "2181:2181"
     healthcheck:
-      test: ["CMD-SHELL", "echo ruok | nc localhost 2181"]
+      test: [ "CMD-SHELL", "echo ruok | nc localhost 2181" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,7 +28,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -47,7 +48,7 @@ services:
       - "9092:9092"
       - "29092:29092"
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+      test: [ "CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -74,15 +75,80 @@ services:
     ports:
       - "5432:5432"
     volumes:
-#      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
       - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql
       - ./postgresql.conf:/etc/postgresql/postgresql.conf
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d fleet_temperature"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d fleet_temperature" ]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+  # Microservices
+  fleet-temperature-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fleet-temperature-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/fleet_temperature
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVER_PORT: 8082
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8082/actuator/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  fleet-temperature-frontend:
+    build:
+      context: ../fleet-temperature-frontend
+      dockerfile: Dockerfile
+    container_name: fleet-temperature-frontend
+    depends_on:
+      fleet-temperature-backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  vhf-simulator:
+    build:
+      context: ../vhf-simulator-standalone/vhf-simulator
+      dockerfile: Dockerfile
+    container_name: vhf-simulator
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVER_PORT: 8081
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+
 
 volumes:
   postgres_data:
